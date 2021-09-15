@@ -18,7 +18,7 @@ import org.apache.pulsar.client.impl.MessageIdImpl;
 public class App 
 {
     // Consumer with Schema.
-    Consumer<GenericRecord> consumer;
+    Consumer<byte[]> consumer;
     // Consumer without Schema.
     Consumer consumerx;
     private String name;
@@ -34,7 +34,7 @@ public class App
 
     App(PulsarClient client, String name, String topic, String sub) {
         try {
-            this.consumer = client.newConsumer(Schema.AUTO_CONSUME())
+            this.consumer = client.newConsumer(Schema.BYTES)
             .topic(topic)
             .subscriptionName(sub)
             .subscriptionType(SubscriptionType.Shared)
@@ -42,7 +42,7 @@ public class App
             .ackTimeout(60, TimeUnit.SECONDS)
             .negativeAckRedeliveryDelay(10L, TimeUnit.SECONDS)
             .deadLetterPolicy(DeadLetterPolicy.builder()
-                .maxRedeliverCount(5)
+                .maxRedeliverCount(1)
                 .deadLetterTopic("dlq-java")
                 .build()
             )
@@ -56,15 +56,15 @@ public class App
 
     public App(PulsarClient client, String name, String topic, String sub, boolean withSchema) {
         try {
-            this.consumerx = client.newConsumer()
+            this.consumerx = client.newConsumer(Schema.AUTO_CONSUME())
                     .topic(topic)
                     .subscriptionName(sub)
                     .subscriptionType(SubscriptionType.Shared)
 //                    .messageListener(new TestListener())
-                    .ackTimeout(5, TimeUnit.SECONDS)
+                    .ackTimeout(300, TimeUnit.SECONDS)
                     .negativeAckRedeliveryDelay(10L, TimeUnit.SECONDS)
                     .deadLetterPolicy(DeadLetterPolicy.builder()
-                            .maxRedeliverCount(5)
+                            .maxRedeliverCount(1)
                             .deadLetterTopic("dlq-java")
                             .build()
                     )
@@ -80,7 +80,7 @@ public class App
         return name;
     }
 
-    private static MessageId convertMessageIdForNack(MessageId messageId) {
+    public static MessageId convertMessageIdForNack(MessageId messageId) {
         if (messageId instanceof BatchMessageIdImpl) {
             BatchMessageIdImpl batchMessageId = (BatchMessageIdImpl) messageId;
             return new MessageIdImpl(batchMessageId.getLedgerId(), batchMessageId.getEntryId(), batchMessageId.getPartitionIndex());
