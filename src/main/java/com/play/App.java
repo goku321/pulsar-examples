@@ -1,5 +1,7 @@
 package com.play;
 
+import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageListener;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.SubscriptionType;
@@ -15,25 +17,23 @@ import org.apache.pulsar.client.impl.MessageIdImpl;
 
 public class App 
 {
-    PulsarClient client;
+    // Consumer with Schema.
     Consumer<GenericRecord> consumer;
+    // Consumer without Schema.
+    Consumer consumerx;
     private String name;
 
-    // MessageListener listener = (consumer, msg) -> {
-    //     try {
-    //         System.out.println("Message received: " + new String(msg.getData()));
-    //         consumer.negativeAcknowledge(msg.getMessageId());
-    //     } catch (Exception e) {
-    //         System.out.println("Encountered exception: " + e.toString());
-    //     }
-    // };
+    MessageListener listener = (consumer, msg) -> {
+         try {
+             System.out.println("Message received: " + new String(msg.getData()));
+             consumer.negativeAcknowledge(msg.getMessageId());
+         } catch (Exception e) {
+             System.out.println("Encountered exception: " + e.toString());
+         }
+     };
 
-    App(String name, String topic, String sub) {
+    App(PulsarClient client, String name, String topic, String sub) {
         try {
-            this.client = PulsarClient.builder()
-            .serviceUrl("pulsar://localhost:6650")
-            .build();
-
             this.consumer = client.newConsumer(Schema.AUTO_CONSUME())
             .topic(topic)
             .subscriptionName(sub)
@@ -50,7 +50,29 @@ public class App
 
             this.name = name;
         } catch (Exception e) {
-            System.out.println(e.toString());
+            System.out.println(e);
+        }
+    }
+
+    public App(PulsarClient client, String name, String topic, String sub, boolean withSchema) {
+        try {
+            this.consumerx = client.newConsumer()
+                    .topic(topic)
+                    .subscriptionName(sub)
+                    .subscriptionType(SubscriptionType.Shared)
+//                    .messageListener(new TestListener())
+                    .ackTimeout(5, TimeUnit.SECONDS)
+                    .negativeAckRedeliveryDelay(10L, TimeUnit.SECONDS)
+                    .deadLetterPolicy(DeadLetterPolicy.builder()
+                            .maxRedeliverCount(5)
+                            .deadLetterTopic("dlq-java")
+                            .build()
+                    )
+                    .subscribe();
+
+            this.name = name;
+        } catch (Exception e) {
+            System.out.println(e);
         }
     }
 
@@ -66,19 +88,29 @@ public class App
             return messageId;
         }
     }
+
     public static void main( String[] args )
     {
-        App app = new App("dlq-app", "my-topic", "test-sub");
+        PulsarClient client = null;
+        try {
+            client = PulsarClient.builder()
+                    .serviceUrl("pulsar://localhost:6650")
+                    .build();
+        } catch (Exception e) {
+            System.err.println("error creating client: " + e.toString());
+        }
+        App app = new App(client, "dlq-app", "my-topic", "test-sub");
+//        App app = new App(client, "dlq-app", "my-topic", "test-sub", true);
         System.out.println(app.getName() + " is running...");
         
-        // while (true) {
-        //     try {
-        //         Message msg = app.consumer.receive();
-        //         System.out.println("message received: " + new String(msg.getData()));
-        //         app.consumer.negativeAcknowledge(msg.getMessageId());
-        //     } catch (Exception e) {
-
-        //     }
-        // }
+//         while (true) {
+//             try {
+//                 Message msg = app.consumerx.receive();
+//                 System.out.println("message received: " + new String(msg.getData()));
+//                 app.consumerx.negativeAcknowledge(msg.getMessageId());
+//             } catch (Exception e) {
+//
+//             }
+//         }
     }
 }

@@ -3,3 +3,8 @@ target
 .settings/
 .project
 .classpath
+.idea
+.DS_Store*
+pulsar-consumer.iml
+src/main/main.iml
+src/test/test.iml
